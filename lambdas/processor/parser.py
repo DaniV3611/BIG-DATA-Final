@@ -71,70 +71,85 @@ def extract_news_from_elespectador(soup):
     """
     news_data = []
     
-    # Buscar diferentes patrones de artículos en El Espectador
-    # Buscar enlaces con títulos de noticias
-    article_links = soup.find_all("a", href=True)
+    # Buscar elementos Card que contienen las noticias
+    cards = soup.find_all("div", class_=lambda x: x and "Card" in x)
     
-    for link in article_links:
+    for card in cards:
         try:
-            href = link.get('href', '')
+            # Buscar el enlace principal de la noticia
+            title_link = card.find("a", href=True)
             
-            # Filtrar solo enlaces que parecen ser de noticias
-            if href and ('noticia' in href or 'articulo' in href or 
-                        href.startswith('/') and len(href.split('/')) >= 3):
+            if title_link:
+                href = title_link.get('href', '')
                 
-                # Extraer titular del texto del enlace o del title attribute
-                titular = link.get_text(strip=True)
-                title_attr = link.get('title', '')
-                
-                if title_attr and len(title_attr) > len(titular):
-                    titular = title_attr
-                
-                # Filtrar títulos que son muy cortos o vacíos
-                if len(titular) < 10:
-                    continue
-                
-                # Si el enlace es relativo, añadir el dominio
-                if href.startswith('/'):
-                    enlace = 'https://www.elespectador.com' + href
-                else:
-                    enlace = href
-                
-                # Extraer categoría de la URL
-                url_parts = href.strip('/').split('/')
-                categoria = 'Sin categoría'
-                
-                if len(url_parts) >= 2:
-                    # La primera parte después del dominio suele ser la categoría
-                    categoria = url_parts[0].replace('-', ' ').title()
-                
-                if titular and enlace and len(titular) > 10:
-                    news_data.append([categoria, titular, enlace])
+                # Solo procesar enlaces que son de noticias de El Espectador
+                if href and ('elespectador.com' in href and 
+                           ('/' in href.replace('https://www.elespectador.com', '')) and
+                           not any(skip in href for skip in ['play', 'autores', 'terminos', 'newsletter'])):
                     
+                    # Buscar el título en h2 dentro del card
+                    title_element = card.find("h2", class_=lambda x: x and "Card-Title" in x)
+                    if title_element:
+                        title_link_element = title_element.find("a")
+                        if title_link_element:
+                            titular = title_link_element.get_text(strip=True)
+                        else:
+                            titular = title_element.get_text(strip=True)
+                    else:
+                        # Si no hay h2, buscar en el enlace principal
+                        titular = title_link.get_text(strip=True)
+                    
+                    # Filtrar títulos muy cortos
+                    if len(titular) < 10:
+                        continue
+                    
+                    enlace = href
+                    
+                    # Buscar la categoría en el Card-Section
+                    section_element = card.find("h4", class_=lambda x: x and "Card-Section" in x)
+                    if section_element:
+                        section_link = section_element.find("a")
+                        if section_link:
+                            categoria = section_link.get_text(strip=True)
+                        else:
+                            categoria = section_element.get_text(strip=True)
+                    else:
+                        # Extraer categoría de la URL como fallback
+                        url_path = href.replace('https://www.elespectador.com/', '')
+                        url_parts = url_path.strip('/').split('/')
+                        if len(url_parts) >= 1 and url_parts[0]:
+                            categoria = url_parts[0].replace('-', ' ').title()
+                        else:
+                            categoria = 'Sin categoría'
+                    
+                    if titular and enlace and len(titular) > 10:
+                        news_data.append([categoria, titular, enlace])
+                        
         except Exception as e:
             continue
     
-    # Buscar también en elementos con clases específicas de El Espectador
-    # Buscar títulos en elementos h1, h2, h3 con enlaces
+    # También buscar enlaces directos en títulos y headings
     for heading in soup.find_all(['h1', 'h2', 'h3', 'h4']):
         try:
             link = heading.find('a', href=True)
             if link:
-                titular = link.get_text(strip=True)
                 href = link.get('href', '')
+                titular = link.get_text(strip=True)
                 
-                if href and len(titular) > 10:
-                    if href.startswith('/'):
-                        enlace = 'https://www.elespectador.com' + href
-                    else:
-                        enlace = href
+                # Solo procesar enlaces que son de noticias de El Espectador
+                if (href and len(titular) > 10 and 
+                    'elespectador.com' in href and
+                    not any(skip in href for skip in ['play', 'autores', 'terminos', 'newsletter'])):
+                    
+                    enlace = href
                     
                     # Extraer categoría de la URL
-                    url_parts = href.strip('/').split('/')
-                    categoria = 'Sin categoría'
-                    
-                    if len(url_parts) >= 2:
+                    url_path = href.replace('https://www.elespectador.com/', '')
+                    url_parts = url_path.strip('/').split('/')
+                    if len(url_parts) >= 1 and url_parts[0]:
                         categoria = url_parts[0].replace('-', ' ').title()
+                    else:
+                        categoria = 'Sin categoría'
                     
                     news_data.append([categoria, titular, enlace])
                     
