@@ -51,6 +51,33 @@ JOBS_CONFIG = {
             '--IAM_ROLE_ARN': IAM_ROLE_ARN,
             '--S3_TARGET_PATH': f's3://{S3_BUCKET}/headlines/final/'
         }
+    },
+    'news-rds-mysql-job': {
+        'script_location': 's3://your-bucket-name/glue-scripts/rds_mysql_job.py',
+        'description': 'Copy news data from S3 (Glue catalog) to RDS MySQL',
+        'arguments': {
+            '--DATABASE_NAME': DATABASE_NAME,
+            '--TABLE_NAME': 'headlines',
+            '--RDS_ENDPOINT': 'news2.cevqoilkonik.us-east-1.rds.amazonaws.com',  # Replace with actual endpoint
+            '--RDS_DATABASE': 'news',
+            '--RDS_TABLE': 'noticias',
+            '--RDS_USERNAME': 'admin',
+            '--RDS_PASSWORD': '123456789',
+            '--JDBC_DRIVER_PATH': f's3://{S3_BUCKET}/drivers/mysql-connector-java-8.0.33.jar'
+        }
+    },
+    'news-rds-crawler-job': {
+        'script_location': 's3://your-bucket-name/glue-scripts/rds_crawler_job.py',
+        'description': 'Create and run crawler to map RDS MySQL to Glue catalog',
+        'arguments': {
+            '--IAM_ROLE_ARN': IAM_ROLE_ARN,
+            '--RDS_ENDPOINT': 'news2.cevqoilkonik.us-east-1.rds.amazonaws.com',  # Replace with actual endpoint
+            '--RDS_DATABASE': 'news',
+            '--RDS_USERNAME': 'admin',
+            '--RDS_PASSWORD': '123456789',
+            '--TARGET_DATABASE': 'news_rds_db',
+            '--CRAWLER_NAME': 'news-rds-crawler'
+        }
     }
 }
 
@@ -85,14 +112,23 @@ def create_or_update_job(job_name, job_config):
             'NumberOfWorkers': 2
         }
         
+        # Add extra JAR files for MySQL jobs
+        if 'mysql' in job_name.lower():
+            job_definition['DefaultArguments']['--extra-jars'] = f's3://{S3_BUCKET}/drivers/mysql-connector-java-8.0.33.jar'
+            # Increase resources for database operations
+            job_definition['WorkerType'] = 'G.2X'
+            job_definition['NumberOfWorkers'] = 3
+            job_definition['Timeout'] = 120  # 2 hours for database operations
+        
         try:
             # Try to get existing job
             glue_client.get_job(JobName=job_name)
             
-            # Job exists, update it
+            # Job exists, update it (remove 'Name' field for update)
+            job_update = {k: v for k, v in job_definition.items() if k != 'Name'}
             glue_client.update_job(
                 JobName=job_name,
-                JobUpdate=job_definition
+                JobUpdate=job_update
             )
             logger.info(f"Updated job: {job_name}")
             
@@ -210,18 +246,66 @@ def create_triggers():
             ]
         }
         
+        # Trigger to start RDS MySQL job after S3 crawler completes
+        rds_mysql_trigger = {
+            'Name': f'{WORKFLOW_NAME}-rds-mysql-trigger',
+            'WorkflowName': WORKFLOW_NAME,
+            'Type': 'CONDITIONAL',
+            'Description': 'Start RDS MySQL job after S3 crawler completes successfully',
+            'Predicate': {
+                'Logical': 'AND',
+                'Conditions': [
+                    {
+                        'LogicalOperator': 'EQUALS',
+                        'JobName': 'news-crawler-job',
+                        'State': 'SUCCEEDED'
+                    }
+                ]
+            },
+            'Actions': [
+                {
+                    'JobName': 'news-rds-mysql-job'
+                }
+            ]
+        }
+        
+        # Trigger to start RDS crawler after MySQL job completes
+        rds_crawler_trigger = {
+            'Name': f'{WORKFLOW_NAME}-rds-crawler-trigger',
+            'WorkflowName': WORKFLOW_NAME,
+            'Type': 'CONDITIONAL',
+            'Description': 'Start RDS crawler job after MySQL job completes successfully',
+            'Predicate': {
+                'Logical': 'AND',
+                'Conditions': [
+                    {
+                        'LogicalOperator': 'EQUALS',
+                        'JobName': 'news-rds-mysql-job',
+                        'State': 'SUCCEEDED'
+                    }
+                ]
+            },
+            'Actions': [
+                {
+                    'JobName': 'news-rds-crawler-job'
+                }
+            ]
+        }
+        
         # Create triggers
-        triggers = [start_trigger, processor_trigger, crawler_trigger]
+        triggers = [start_trigger, processor_trigger, crawler_trigger, rds_mysql_trigger, rds_crawler_trigger]
         
         for trigger in triggers:
             try:
                 # Try to get existing trigger
                 glue_client.get_trigger(Name=trigger['Name'])
                 
-                # Trigger exists, update it
+                # Trigger exists, update it (remove fields not allowed in TriggerUpdate)
+                trigger_update = {k: v for k, v in trigger.items() 
+                                if k not in ['Name', 'WorkflowName', 'Type']}
                 glue_client.update_trigger(
                     Name=trigger['Name'],
-                    TriggerUpdate=trigger
+                    TriggerUpdate=trigger_update
                 )
                 logger.info(f"Updated trigger: {trigger['Name']}")
                 

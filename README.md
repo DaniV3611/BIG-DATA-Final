@@ -56,26 +56,38 @@ Repetir los puntos **a)** al **c)** implementados como:
 **📂 Implementación disponible en:** `glue_jobs/`
 
 **Características implementadas:**
+
 - 3 Glue Jobs (extractor, processor, crawler)
 - Workflow completo con triggers condicionales
 - Script de deployment automatizado
 - Suite de testing comprehensiva
 - Documentación detallada
 
-### 🚧 Pendientes
-
-#### e) Integración con RDS MySQL
+#### e) Integración con RDS MySQL ✅
 
 **Base de datos:**
 
-- Crear BD **MySQL en RDS** con la tabla respectiva
-- Mapear con un crawler al catálogo de Glue
+- Crear BD **MySQL en RDS** con la tabla respectiva ✅
+- Mapear con un crawler al catálogo de Glue ✅
 
 **Job de inserción:**
 
-- Usar **AWS Glue Connectors** y **AWS Job**
-- Copiar de tabla a tabla (S3 → RDS en el catálogo)
-- **Activar "job bookmarks"** para evitar duplicados
+- Usar **AWS Glue Connectors** y **AWS Job** ✅
+- Copiar de tabla a tabla (S3 → RDS en el catálogo) ✅
+- **Activar "job bookmarks"** para evitar duplicados ✅
+
+**📂 Implementación disponible en:** `glue_jobs/`
+
+**Características implementadas:**
+
+- Job de copia S3 → RDS MySQL (`rds_mysql_job.py`)
+- Crawler para mapeo RDS → Glue Catalog (`rds_crawler_job.py`)
+- Conexión JDBC automática con driver MySQL
+- Workflow extendido (5 jobs total)
+- Script SQL para setup de tabla
+- Documentación completa en `RDS_SETUP.md`
+
+### 🚧 Pendientes
 
 #### f) Pipeline de Machine Learning con PySpark
 
@@ -136,53 +148,81 @@ Crear un pipeline de procesamiento usando **PySpark ML** en **Notebook sobre EMR
 │   ├── extractor/               # Lambda de extracción web
 │   ├── processor/               # Lambda de procesamiento HTML
 │   └── crawler/                # Lambda de crawler Glue
-├── glue_jobs/                  # ✅ Jobs y Workflows de Glue
-│   ├── extractor_job.py        # Job de extracción migrado
-│   ├── processor_job.py        # Job de procesamiento migrado
-│   ├── crawler_job.py          # Job de crawler migrado
-│   ├── workflow_definition.py  # Definición del workflow
+├── glue_jobs/                  # ✅ Jobs y Workflows de Glue (Organizados por Puntos)
+│   ├── punto_d_glue_migration/  # ✅ Punto d) Migración a Glue Jobs
+│   │   ├── extractor_job.py     # Job de extracción migrado
+│   │   ├── processor_job.py     # Job de procesamiento migrado
+│   │   ├── crawler_job.py       # Job de crawler migrado
+│   │   └── README.md           # Documentación punto d
+│   ├── punto_e_rds_integration/ # ✅ Punto e) Integración RDS MySQL
+│   │   ├── rds_mysql_job.py     # Job de copia S3 → RDS MySQL
+│   │   ├── rds_crawler_job.py   # Job de crawler RDS → Glue Catalog
+│   │   ├── setup_mysql_table.sql # Script SQL para crear tabla RDS
+│   │   └── RDS_SETUP.md        # Documentación RDS detallada
+│   ├── punto_f_ml_pipeline/     # 🚧 Punto f) Pipeline de ML con PySpark
+│   │   └── README.md           # Especificaciones y plan
+│   ├── punto_g_emr_automation/  # 🚧 Punto g) Automatización EMR
+│   │   └── README.md           # Especificaciones y plan
+│   ├── workflow_definition.py   # Definición del workflow completo (5 jobs)
 │   ├── deploy.py               # Script de deployment
 │   ├── test_jobs.py           # Suite de testing
 │   ├── requirements.txt        # Dependencias
-│   └── README.md              # Documentación detallada
+│   └── README.md              # Documentación general
 ├── emr_scripts/               # Scripts para EMR (pendiente)
 ├── tests/                     # Pruebas unitarias
 ├── .github/workflows/         # CI/CD pipelines
 └── README.md                  # Esta documentación
 ```
 
-## 🚀 Quick Start - Glue Jobs (Punto d)
+## 🚀 Quick Start - Glue Jobs (Puntos d y e)
 
 ### 1. Configurar credenciales AWS
+
 ```bash
 aws configure
 ```
 
-### 2. Desplegar Glue Jobs y Workflow
+### 2. Setup RDS MySQL (Punto e)
+
+```bash
+# Configurar la tabla en tu instancia RDS
+mysql -h news2.cluster-xxxxx.us-east-1.rds.amazonaws.com -u admin -p news < glue_jobs/punto_e_rds_integration/setup_mysql_table.sql
+
+# Actualizar endpoint real en workflow_definition.py
+# Reemplazar 'news2.cluster-xxxxx.us-east-1.rds.amazonaws.com' con tu endpoint real
+```
+
+### 3. Desplegar Glue Jobs y Workflow (5 jobs)
+
 ```bash
 cd glue_jobs/
 python deploy.py YOUR_BUCKET_NAME YOUR_IAM_ROLE_ARN us-east-1
 ```
 
-### 3. Probar el workflow
+### 4. Probar el workflow
+
 ```bash
 python test_jobs.py all YOUR_BUCKET_NAME
 ```
 
-### 4. Verificar en AWS Console
-- **AWS Glue > Workflows**: Verificar `news-processing-workflow`
-- **AWS Athena**: Consultar datos en `news_headlines_db`
-- **S3**: Verificar estructura de particiones
+### 5. Verificar en AWS Console
 
-Para más detalles, consultar: [`glue_jobs/README.md`](glue_jobs/README.md)
+- **AWS Glue > Workflows**: Verificar `news-processing-workflow` (5 jobs)
+- **AWS Athena**: Consultar datos en `news_headlines_db` y `news_rds_db`
+- **S3**: Verificar estructura de particiones
+- **RDS MySQL**: Consultar tabla `noticias`
+
+Para más detalles sobre RDS, consultar: [`glue_jobs/punto_e_rds_integration/RDS_SETUP.md`](glue_jobs/punto_e_rds_integration/RDS_SETUP.md)
+Para detalles del punto d, consultar: [`glue_jobs/punto_d_glue_migration/README.md`](glue_jobs/punto_d_glue_migration/README.md)
+Para detalles generales, consultar: [`glue_jobs/README.md`](glue_jobs/README.md)
 
 ## 📈 Roadmap
 
 - [x] **Punto a)** - Lambda Extractor con Zappa
-- [x] **Punto b)** - Lambda Processor con BeautifulSoup  
+- [x] **Punto b)** - Lambda Processor con BeautifulSoup
 - [x] **Punto c)** - Lambda Crawler para Glue
 - [x] **Punto d)** - Migración a Glue Jobs y Workflows
-- [ ] **Punto e)** - Integración con RDS MySQL
+- [x] **Punto e)** - Integración con RDS MySQL
 - [ ] **Punto f)** - Pipeline de ML con PySpark
 - [ ] **Punto g)** - Automatización EMR con Lambda
 - [ ] **CI/CD** - Pipeline de despliegue continuo
@@ -194,28 +234,28 @@ Para más detalles, consultar: [`glue_jobs/README.md`](glue_jobs/README.md)
 graph TB
     subgraph "Glue Workflow (✅ Implementado)"
         A[Daily Trigger<br/>6 AM UTC] --> B[Extractor Job]
-        B --> C[Processor Job]  
+        B --> C[Processor Job]
         C --> D[Crawler Job]
     end
-    
+
     subgraph "Storage & Catalog"
         E[S3 Raw HTML]
         F[S3 Partitioned CSV]
         G[Glue Data Catalog]
         H[Athena Queries]
     end
-    
+
     B --> E
     C --> F
     D --> G
     G --> H
-    
+
     subgraph "Future (Pendiente)"
         I[RDS MySQL]
         J[EMR ML Pipeline]
         K[Lambda EMR Manager]
     end
-    
+
     F -.-> I
     F -.-> J
     K -.-> J
