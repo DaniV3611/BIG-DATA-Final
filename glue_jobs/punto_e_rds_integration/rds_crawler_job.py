@@ -58,7 +58,7 @@ def create_rds_connection():
     """
     try:
         connection_name = "news-rds-connection"
-        
+
         # Check if connection exists (should be created by deployment)
         try:
             glue_client.get_connection(Name=connection_name)
@@ -69,7 +69,7 @@ def create_rds_connection():
             logger.error("This connection should be created during deployment.")
             logger.error("Please run the deployment script to create all required resources.")
             return None
-  
+
     except Exception as e:
         logger.error(f"❌ Error checking RDS connection: {str(e)}")
         return None
@@ -223,11 +223,11 @@ def verify_catalog_tables():
     """
     try:
         logger.info(f"🔍 Verifying tables in database: {TARGET_DATABASE}")
-        
+
         # Get tables in the database
         response = glue_client.get_tables(DatabaseName=TARGET_DATABASE)
         tables = response.get('TableList', [])
-        
+
         if not tables:
             logger.warning("⚠️ No tables found in target database")
             return False

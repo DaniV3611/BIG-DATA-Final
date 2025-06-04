@@ -6,7 +6,6 @@ Migrated from Lambda extractor functionality
 """
 
 import sys
-import os
 import requests
 import boto3
 from datetime import date
@@ -42,6 +41,7 @@ S3_PREFIX = args.get('S3_PREFIX', 'headlines/raw')
 # Initialize S3 client
 s3_client = boto3.client('s3')
 
+
 def download_webpage(url, timeout=30):
     """
     Download webpage content
@@ -51,7 +51,10 @@ def download_webpage(url, timeout=30):
     """
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': """
+            Mozilla/5.0 
+            (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36
+            """
         }
         response = requests.get(url, timeout=timeout, headers=headers)
         response.raise_for_status()
@@ -59,6 +62,7 @@ def download_webpage(url, timeout=30):
     except Exception as e:
         logger.error(f"Error downloading {url}: {str(e)}")
         return None
+
 
 def upload_to_s3(content, s3_key):
     """
@@ -80,6 +84,7 @@ def upload_to_s3(content, s3_key):
         logger.error(f"Error uploading to S3: {str(e)}")
         return False
 
+
 def main():
     """
     Main extraction logic
@@ -87,41 +92,41 @@ def main():
     try:
         # Get current date
         curr_date = date.today().strftime("%Y-%m-%d")
-        
+
         # Define newspapers and their URLs
         newspapers = {
             'eltiempo': 'https://www.eltiempo.com/',
             'elespectador': 'https://www.elespectador.com/'
         }
-        
+
         logger.info(f"Starting web extraction for date: {curr_date}")
-        
+
         for newspaper, url in newspapers.items():
             logger.info(f"Downloading {newspaper} from {url}")
             
             # Download webpage
             content = download_webpage(url)
-            
+    
             if content:
                 # Create S3 key with the required structure
                 s3_key = f"{S3_PREFIX}/{newspaper}-{curr_date}.html"
-                
+
                 # Upload to S3
                 success = upload_to_s3(content, s3_key)
-                
+
                 if success:
                     logger.info(f"✅ Successfully processed {newspaper}")
                 else:
                     logger.error(f"❌ Failed to upload {newspaper}")
             else:
                 logger.error(f"❌ Failed to download content from {newspaper}")
-        
+
         logger.info("Web extraction job completed")
-        
+
     except Exception as e:
         logger.error(f"Error in main extraction logic: {str(e)}")
         raise e
 
 if __name__ == "__main__":
     main()
-    job.commit() 
+    job.commit()

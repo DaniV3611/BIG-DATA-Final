@@ -167,7 +167,7 @@ class GlueJobDeployer:
                 self.s3_client.head_object(Bucket=self.s3_bucket, Key="drivers/mysql-connector-java-8.0.33.jar")
                 logger.info(f"✅ MySQL driver validated: s3://{self.s3_bucket}/drivers/mysql-connector-java-8.0.33.jar")
             except ClientError:
-                logger.warning(f"⚠️ MySQL driver not found: s3://{self.s3_bucket}/drivers/mysql-connector-java-8.0.33.jar")
+                logger.warning(f"Driver not found: s3://{self.s3_bucket}/drivers/mysql-connector-java-8.0.33.jar")
             # Check if RDS connection exists
             try:
                 self.glue_client.get_connection(Name="news-rds-connection")
@@ -348,16 +348,16 @@ def main():
     if success:
         print("\n✅ Deployment Summary:")
         print(f"   📦 S3 Bucket: {s3_bucket}")
-        print(f"   🔧 Glue Jobs: 5 jobs created")
-        print(f"     - news-extractor-job (Web scraping)")
-        print(f"     - news-processor-job (HTML processing)")
-        print(f"     - news-crawler-job (S3 catalog update)")
-        print(f"     - news-rds-mysql-job (S3 → RDS copy)")
-        print(f"     - news-rds-crawler-job (RDS catalog mapping)")
-        print(f"   🔄 Workflow: news-processing-workflow")
-        print(f"   🔗 RDS Connection: news-rds-connection (created)")
-        print(f"   📅 Schedule: Daily at 6 AM UTC")
-        print(f"   🗄️ RDS Integration: MySQL database mapping")
+        print("   🔧 Glue Jobs: 5 jobs created")
+        print("     - news-extractor-job (Web scraping)")
+        print("     - news-processor-job (HTML processing)")
+        print("     - news-crawler-job (S3 catalog update)")
+        print("     - news-rds-mysql-job (S3 → RDS copy)")
+        print("     - news-rds-crawler-job (RDS catalog mapping)")
+        print("   🔄 Workflow: news-processing-workflow")
+        print("   🔗 RDS Connection: news-rds-connection (created)")
+        print("   📅 Schedule: Daily at 6 AM UTC")
+        print("   🗄️ RDS Integration: MySQL database mapping")
         print(f"   🌍 Region: {aws_region}")
         print("\n🎯 Next steps:")
         print("   1. ✅ RDS connection created and ready")
@@ -375,4 +375,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()

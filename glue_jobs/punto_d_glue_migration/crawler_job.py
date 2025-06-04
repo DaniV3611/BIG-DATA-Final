@@ -47,6 +47,7 @@ S3_TARGET_PATH = args.get('S3_TARGET_PATH', f's3://{S3_BUCKET}/headlines/final/'
 # Initialize AWS clients
 glue_client = boto3.client('glue')
 
+
 def check_glue_database_exists():
     """
     Check if Glue database exists, create if not
@@ -73,6 +74,7 @@ def check_glue_database_exists():
         logger.error(f"Error checking database: {str(e)}")
         return False
 
+
 def ensure_crawler_exists():
     """
     Check if crawler exists, create it if it doesn't
@@ -87,6 +89,7 @@ def ensure_crawler_exists():
     except Exception as e:
         logger.error(f"Error checking crawler: {str(e)}")
         return False
+
 
 def create_crawler():
     """
@@ -134,6 +137,7 @@ def create_crawler():
         logger.error(f"Error creating crawler: {str(e)}")
         return False
 
+
 def start_crawler():
     """
     Start the Glue crawler
@@ -156,6 +160,7 @@ def start_crawler():
         logger.error(f"Error starting crawler: {str(e)}")
         return False
 
+
 def wait_for_crawler_completion(max_wait_time=300):
     """
     Wait for crawler to complete
@@ -176,7 +181,7 @@ def wait_for_crawler_completion(max_wait_time=300):
                     tables_updated = last_crawl.get('MetricsLog', {}).get('TablesUpdated', 0)
                     tables_deleted = last_crawl.get('MetricsLog', {}).get('TablesDeleted', 0)
                     logger.info(
-                        f"Crawler metrics - Created: {tables_created}, Updated: {tables_updated}, Deleted: {tables_deleted}"
+                        f"MetricsCreated: {tables_created}, Updated: {tables_updated}, Deleted: {tables_deleted}"
                     )
                 return True
             elif state in ['STOPPING', 'STOPPED']:
@@ -189,6 +194,7 @@ def wait_for_crawler_completion(max_wait_time=300):
             return False
     logger.warning(f"Crawler {CRAWLER_NAME} did not complete within {max_wait_time} seconds")
     return False
+
 
 def get_table_info():
     """
@@ -220,6 +226,7 @@ def get_table_info():
     except Exception as e:
         logger.error(f"Error getting table info: {str(e)}")
         return False
+
 
 def main():
     """
@@ -254,4 +261,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    job.commit() 
+    job.commit()
