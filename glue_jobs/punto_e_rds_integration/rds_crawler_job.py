@@ -50,28 +50,30 @@ CRAWLER_NAME = args.get('CRAWLER_NAME', 'news-rds-crawler')
 # Initialize Glue client
 glue_client = boto3.client('glue')
 
+
 def create_rds_connection():
     """
     Verify that the Glue connection for RDS MySQL exists
     @return: Connection name or None
     """
     try:
-        connection_name = f"news-rds-connection"
+        connection_name = "news-rds-connection"
         
         # Check if connection exists (should be created by deployment)
         try:
             glue_client.get_connection(Name=connection_name)
-            logger.info(f"✅ Connection {connection_name} exists and is ready to use")
+            logger.info("✅ Connection {} exists and is ready to use".format(connection_name))
             return connection_name
         except glue_client.exceptions.EntityNotFoundException:
             logger.error(f"❌ Connection {connection_name} does not exist!")
             logger.error("This connection should be created during deployment.")
             logger.error("Please run the deployment script to create all required resources.")
             return None
-        
+  
     except Exception as e:
         logger.error(f"❌ Error checking RDS connection: {str(e)}")
         return None
+
 
 def create_target_database():
     """
@@ -86,21 +88,22 @@ def create_target_database():
             return True
         except glue_client.exceptions.EntityNotFoundException:
             logger.info(f"Database {TARGET_DATABASE} does not exist, creating...")
-        
+
         # Create database
         database_input = {
             'Name': TARGET_DATABASE,
             'Description': 'Database for news RDS MySQL tables mapped to Glue catalog'
         }
-        
+
         glue_client.create_database(DatabaseInput=database_input)
         logger.info(f"✅ Successfully created database: {TARGET_DATABASE}")
-        
+
         return True
-        
+
     except Exception as e:
         logger.error(f"❌ Error creating database: {str(e)}")
         return False
+
 
 def create_rds_crawler(connection_name):
     """
@@ -116,7 +119,7 @@ def create_rds_crawler(connection_name):
             return True
         except glue_client.exceptions.EntityNotFoundException:
             logger.info(f"Crawler {CRAWLER_NAME} does not exist, creating...")
-        
+
         # Crawler configuration
         crawler_config = {
             'Name': CRAWLER_NAME,
@@ -142,16 +145,17 @@ def create_rds_crawler(connection_name):
                 'CrawlerLineageSettings': 'ENABLE'
             }
         }
-        
+
         # Create the crawler
         glue_client.create_crawler(**crawler_config)
         logger.info(f"✅ Successfully created crawler: {CRAWLER_NAME}")
-        
+
         return True
-        
+
     except Exception as e:
         logger.error(f"❌ Error creating crawler: {str(e)}")
         return False
+
 
 def run_crawler():
     """
@@ -160,31 +164,31 @@ def run_crawler():
     """
     try:
         logger.info(f"🚀 Starting crawler: {CRAWLER_NAME}")
-        
+
         # Start the crawler
         glue_client.start_crawler(Name=CRAWLER_NAME)
-        
+
         # Wait for crawler to complete
         max_wait_time = 600  # 10 minutes
         wait_interval = 30   # 30 seconds
         elapsed_time = 0
-        
+
         while elapsed_time < max_wait_time:
             # Get crawler status
             response = glue_client.get_crawler(Name=CRAWLER_NAME)
             state = response['Crawler']['State']
-            
+
             logger.info(f"Crawler state: {state} (elapsed: {elapsed_time}s)")
-            
+
             if state == 'READY':
                 # Get crawler metrics
                 last_crawl = response['Crawler'].get('LastCrawl', {})
                 if last_crawl:
-                    logger.info(f"✅ Crawler completed successfully")
+                    logger.info("✅ Crawler completed successfully")
                     logger.info(f"Tables created/updated: {last_crawl.get('TablesCreated', 0)}")
                     logger.info(f"Tables updated: {last_crawl.get('TablesUpdated', 0)}")
                     logger.info(f"Tables deleted: {last_crawl.get('TablesDeleted', 0)}")
-                    
+
                     if last_crawl.get('Status') == 'SUCCEEDED':
                         return True
                     else:
@@ -193,23 +197,24 @@ def run_crawler():
                 else:
                     logger.warning("⚠️ No crawl history found")
                     return False
-                    
+
             elif state == 'RUNNING':
                 # Continue waiting
                 time.sleep(wait_interval)
                 elapsed_time += wait_interval
                 continue
-                
+
             else:
                 logger.error(f"❌ Unexpected crawler state: {state}")
                 return False
-        
+
         logger.error(f"❌ Crawler timed out after {max_wait_time} seconds")
         return False
-        
+
     except Exception as e:
         logger.error(f"❌ Error running crawler: {str(e)}")
         return False
+
 
 def verify_catalog_tables():
     """
@@ -226,27 +231,28 @@ def verify_catalog_tables():
         if not tables:
             logger.warning("⚠️ No tables found in target database")
             return False
-        
+
         logger.info(f"✅ Found {len(tables)} tables in catalog:")
-        
+
         for table in tables:
             table_name = table['Name']
             column_count = len(table.get('StorageDescriptor', {}).get('Columns', []))
-            
+
             logger.info(f"  📋 Table: {table_name} ({column_count} columns)")
-            
+
             # Show column details for main table
             if table_name == 'noticias':
                 columns = table.get('StorageDescriptor', {}).get('Columns', [])
                 logger.info(f"    Columns in {table_name}:")
                 for col in columns:
                     logger.info(f"      - {col['Name']}: {col['Type']}")
-        
+
         return True
-        
+
     except Exception as e:
         logger.error(f"❌ Error verifying catalog tables: {str(e)}")
         return False
+
 
 def main():
     """
@@ -258,46 +264,47 @@ def main():
         logger.info(f"Database: {RDS_DATABASE}")
         logger.info(f"Target Catalog Database: {TARGET_DATABASE}")
         logger.info(f"Crawler Name: {CRAWLER_NAME}")
-        
+
         # Step 1: Create target database in Glue catalog
         logger.info("📊 Creating target database in Glue catalog...")
         if not create_target_database():
             logger.error("❌ Failed to create target database")
             return
-        
+
         # Step 2: Create RDS connection
         logger.info("🔗 Creating RDS connection...")
         connection_name = create_rds_connection()
         if not connection_name:
             logger.error("❌ Failed to create RDS connection")
             return
-        
+
         # Step 3: Create RDS crawler
         logger.info("🕷️ Creating RDS crawler...")
         if not create_rds_crawler(connection_name):
             logger.error("❌ Failed to create crawler")
             return
-        
+
         # Step 4: Run the crawler
         logger.info("▶️ Running RDS crawler...")
         if not run_crawler():
             logger.error("❌ Crawler execution failed")
             return
-        
+
         # Step 5: Verify catalog tables
         logger.info("✅ Verifying catalog tables...")
         if not verify_catalog_tables():
             logger.error("❌ Table verification failed")
             return
-        
+
         logger.info("✅ RDS MySQL Crawler Job completed successfully")
         logger.info("🎉 RDS tables are now available in Glue Data Catalog")
         logger.info(f"📋 You can now query tables in database: {TARGET_DATABASE}")
-        
+
     except Exception as e:
         logger.error(f"❌ Error in main processing logic: {str(e)}")
         raise e
 
+
 if __name__ == "__main__":
     main()
-    job.commit() 
+    job.commit()
