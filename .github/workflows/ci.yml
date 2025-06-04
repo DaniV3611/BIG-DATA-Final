@@ -85,11 +85,5 @@ jobs:
             echo "No se encontró zappa_settings.json, omitiendo despliegue Lambda."
           fi
 
-      - name: Desplegar Glue/EMR/S3 scripts (placeholder)
-        run: |
-          echo "Aquí puedes agregar comandos aws cli o scripts para Glue, EMR, S3, etc."
-          # Ejemplo: aws s3 sync glue_jobs/ s3://mi-bucket-glue-jobs/
-          # Ejemplo: aws emr add-steps --cluster-id ... --steps file://emr_scripts/step.json
-
       - name: Confirmar despliegue
         run: echo "Despliegue a DEV realizado correctamente"
