@@ -1,0 +1,95 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test-and-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r tests/requirements-test.txt
+
+      - name: Linter (flake8)
+        run: |
+          source .venv/bin/activate
+          flake8 .
+
+      - name: Ejecutar tests rápidos
+        run: |
+          source .venv/bin/activate
+          python tests/run_tests.py --fast
+
+      - name: Ejecutar tests completos y cobertura
+        run: |
+          source .venv/bin/activate
+          python tests/run_tests.py --all --coverage
+
+      - name: Subir reporte de cobertura
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: tests/htmlcov/
+
+  deploy:
+    needs: test-and-quality
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    environment: dev
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias de producción
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION || 'us-east-1' }}
+          aws_session_token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Desplegar Lambdas con Zappa (dev)
+        run: |
+          source .venv/bin/activate
+          if [ -f zappa_settings.json ]; then
+            pip install zappa
+            zappa update dev || zappa deploy dev
+          else
+            echo "No se encontró zappa_settings.json, omitiendo despliegue Lambda."
+          fi
+
+      - name: Desplegar Glue/EMR/S3 scripts (placeholder)
+        run: |
+          echo "Aquí puedes agregar comandos aws cli o scripts para Glue, EMR, S3, etc."
+          # Ejemplo: aws s3 sync glue_jobs/ s3://mi-bucket-glue-jobs/
+          # Ejemplo: aws emr add-steps --cluster-id ... --steps file://emr_scripts/step.json
+
+      - name: Confirmar despliegue
+        run: echo "Despliegue a DEV realizado correctamente"
