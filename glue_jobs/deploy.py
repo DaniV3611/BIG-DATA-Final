@@ -29,9 +29,11 @@ class GlueJobDeployer:
         
         # Script mappings
         self.scripts = {
-            'extractor_job.py': 'glue-scripts/extractor_job.py',
-            'processor_job.py': 'glue-scripts/processor_job.py',
-            'crawler_job.py': 'glue-scripts/crawler_job.py'
+            'punto_d_glue_migration/extractor_job.py': 'glue-scripts/extractor_job.py',
+            'punto_d_glue_migration/processor_job.py': 'glue-scripts/processor_job.py',
+            'punto_d_glue_migration/crawler_job.py': 'glue-scripts/crawler_job.py',
+            'punto_e_rds_integration/rds_mysql_job.py': 'glue-scripts/rds_mysql_job.py',
+            'punto_e_rds_integration/rds_crawler_job.py': 'glue-scripts/rds_crawler_job.py'
         }
     
     def get_full_iam_role_arn(self, role_name_or_arn):
@@ -137,7 +139,9 @@ class GlueJobDeployer:
             
             # Update job script locations
             for job_name, job_config in workflow_definition.JOBS_CONFIG.items():
-                script_name = job_name.replace('news-', '').replace('-job', '_job.py')
+                # Generate correct script name by replacing hyphens with underscores
+                base_name = job_name.replace('news-', '').replace('-job', '')
+                script_name = base_name.replace('-', '_') + '_job.py'
                 job_config['script_location'] = f's3://{self.s3_bucket}/glue-scripts/{script_name}'
                 
                 # Update IAM role in job arguments if present
@@ -175,8 +179,29 @@ class GlueJobDeployer:
                     logger.error(f"❌ Script not found: s3://{self.s3_bucket}/{s3_key}")
                     return False
             
+            # Check if MySQL driver exists
+            try:
+                self.s3_client.head_object(Bucket=self.s3_bucket, Key="drivers/mysql-connector-java-8.0.33.jar")
+                logger.info(f"✅ MySQL driver validated: s3://{self.s3_bucket}/drivers/mysql-connector-java-8.0.33.jar")
+            except ClientError:
+                logger.warning(f"⚠️ MySQL driver not found: s3://{self.s3_bucket}/drivers/mysql-connector-java-8.0.33.jar")
+            
+            # Check if RDS connection exists
+            try:
+                self.glue_client.get_connection(Name="news-rds-connection")
+                logger.info("✅ RDS connection validated: news-rds-connection")
+            except ClientError:
+                logger.error("❌ RDS connection not found: news-rds-connection")
+                return False
+            
             # Check if Glue jobs exist
-            jobs_to_check = ['news-extractor-job', 'news-processor-job', 'news-crawler-job']
+            jobs_to_check = [
+                'news-extractor-job', 
+                'news-processor-job', 
+                'news-crawler-job',
+                'news-rds-mysql-job',
+                'news-rds-crawler-job'
+            ]
             
             for job_name in jobs_to_check:
                 try:
@@ -213,6 +238,15 @@ class GlueJobDeployer:
         if not self.check_s3_bucket_exists():
             return False
         
+        # Upload MySQL JDBC driver
+        if not self.upload_mysql_driver():
+            logger.warning("⚠️ MySQL driver upload failed, but continuing deployment...")
+        
+        # Create RDS connection
+        if not self.create_rds_connection():
+            logger.error("❌ Failed to create RDS connection")
+            return False
+        
         # Upload scripts
         if not self.upload_all_scripts():
             return False
@@ -227,6 +261,119 @@ class GlueJobDeployer:
         
         logger.info("🎉 Deployment completed successfully!")
         return True
+
+    def upload_mysql_driver(self):
+        """
+        Download and upload MySQL JDBC driver to S3
+        @return: Success boolean
+        """
+        try:
+            import urllib.request
+            import tempfile
+            import os
+            
+            logger.info("📦 Setting up MySQL JDBC driver...")
+            
+            # MySQL JDBC driver URL
+            driver_url = "https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.2.0/mysql-connector-j-8.2.0.jar"
+            s3_key = "drivers/mysql-connector-java-8.0.33.jar"
+            
+            # Check if driver already exists in S3
+            try:
+                self.s3_client.head_object(Bucket=self.s3_bucket, Key=s3_key)
+                logger.info(f"✅ MySQL driver already exists: s3://{self.s3_bucket}/{s3_key}")
+                return True
+            except ClientError:
+                logger.info("MySQL driver not found in S3, downloading...")
+            
+            # Download driver to temp file with proper cleanup
+            temp_file = None
+            temp_path = None
+            try:
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.jar')
+                temp_path = temp_file.name
+                temp_file.close()  # Close file handle before downloading
+                
+                logger.info(f"Downloading MySQL driver from: {driver_url}")
+                urllib.request.urlretrieve(driver_url, temp_path)
+                
+                # Upload to S3
+                self.s3_client.upload_file(temp_path, self.s3_bucket, s3_key)
+                logger.info(f"✅ Uploaded MySQL driver to s3://{self.s3_bucket}/{s3_key}")
+                
+                return True
+                
+            finally:
+                # Clean up temp file
+                if temp_path and os.path.exists(temp_path):
+                    try:
+                        os.unlink(temp_path)
+                    except Exception as cleanup_error:
+                        logger.warning(f"Could not clean up temp file: {cleanup_error}")
+            
+        except Exception as e:
+            logger.error(f"❌ Error uploading MySQL driver: {str(e)}")
+            logger.error("You may need to manually upload the MySQL JDBC driver to S3")
+            logger.error(f"Download from: https://dev.mysql.com/downloads/connector/j/")
+            logger.error(f"Upload to: s3://{self.s3_bucket}/drivers/mysql-connector-java-8.0.33.jar")
+            return False
+
+    def create_rds_connection(self):
+        """
+        Create RDS connection in Glue
+        @return: Success boolean
+        """
+        try:
+            logger.info("🔗 Creating RDS connection in Glue...")
+            
+            connection_name = "news-rds-connection"
+            
+            # Check if connection already exists
+            try:
+                self.glue_client.get_connection(Name=connection_name)
+                logger.info(f"✅ Connection {connection_name} already exists")
+                return True
+            except ClientError as e:
+                if e.response['Error']['Code'] == 'EntityNotFoundException':
+                    logger.info(f"Connection {connection_name} does not exist, creating...")
+                else:
+                    raise e
+            
+            # RDS endpoint - you should update this with your real endpoint
+            rds_endpoint = "news2.cevqoilkonik.us-east-1.rds.amazonaws.com"
+            rds_database = "news"
+            rds_username = "admin"
+            rds_password = "123456789"
+            
+            # JDBC URL for MySQL
+            jdbc_url = f"jdbc:mysql://{rds_endpoint}:3306/{rds_database}"
+            
+            # Connection properties
+            connection_properties = {
+                'Name': connection_name,
+                'ConnectionType': 'JDBC',
+                'ConnectionProperties': {
+                    'JDBC_CONNECTION_URL': jdbc_url,
+                    'USERNAME': rds_username,
+                    'PASSWORD': rds_password,
+                    'JDBC_DRIVER_CLASS_NAME': 'com.mysql.cj.jdbc.Driver'
+                },
+                'Description': 'Connection to news RDS MySQL database for Glue jobs'
+            }
+            
+            # Create the connection
+            self.glue_client.create_connection(ConnectionInput=connection_properties)
+            logger.info(f"✅ Successfully created connection: {connection_name}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error creating RDS connection: {str(e)}")
+            logger.error("Make sure:")
+            logger.error("1. RDS instance is running and accessible")
+            logger.error("2. Security groups allow Glue connections")
+            logger.error("3. RDS credentials are correct")
+            return False
 
 def main():
     """
@@ -251,14 +398,26 @@ def main():
     if success:
         print("\n✅ Deployment Summary:")
         print(f"   📦 S3 Bucket: {s3_bucket}")
-        print(f"   🔧 Glue Jobs: 3 jobs created")
+        print(f"   🔧 Glue Jobs: 5 jobs created")
+        print(f"     - news-extractor-job (Web scraping)")
+        print(f"     - news-processor-job (HTML processing)")
+        print(f"     - news-crawler-job (S3 catalog update)")
+        print(f"     - news-rds-mysql-job (S3 → RDS copy)")
+        print(f"     - news-rds-crawler-job (RDS catalog mapping)")
         print(f"   🔄 Workflow: news-processing-workflow")
+        print(f"   🔗 RDS Connection: news-rds-connection (created)")
         print(f"   📅 Schedule: Daily at 6 AM UTC")
+        print(f"   🗄️ RDS Integration: MySQL database mapping")
         print(f"   🌍 Region: {aws_region}")
         print("\n🎯 Next steps:")
-        print("   1. Test the workflow manually in AWS Glue console")
-        print("   2. Monitor CloudWatch logs for job execution")
-        print("   3. Verify data is being created in S3 and Glue catalog")
+        print("   1. ✅ RDS connection created and ready")
+        print("   2. Test individual jobs manually in AWS Glue console")
+        print("   3. Monitor CloudWatch logs for job execution")
+        print("   4. Verify data flows: S3 → Glue Catalog → RDS MySQL")
+        print("   5. Query data via Athena (S3 tables) or directly from RDS")
+        print("\n🔧 Manual Testing:")
+        print("   - news-rds-mysql-job: Should now work without connection errors")
+        print("   - news-rds-crawler-job: Will create RDS tables in Glue catalog")
         sys.exit(0)
     else:
         print("\n❌ Deployment failed. Check the logs above for details.")
