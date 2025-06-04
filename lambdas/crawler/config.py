@@ -28,8 +28,8 @@ ATHENA_WORKGROUP = os.getenv('ATHENA_WORKGROUP', 'primary')
 ATHENA_OUTPUT_LOCATION = f's3://{S3_BUCKET}/athena-results/'
 
 # Table Configuration
-TABLE_NAME = 'headlines'
-TABLE_DESCRIPTION = 'News headlines from Colombian newspapers'
+TABLE_NAME = 'final_headlines'
+TABLE_DESCRIPTION = 'Headlines from El Tiempo and El Espectador'
 
 # Partition Configuration
 PARTITION_KEYS = ['periodico', 'year', 'month', 'day']
