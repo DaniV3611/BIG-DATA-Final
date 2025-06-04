@@ -52,7 +52,7 @@ def download_webpage(url, timeout=30):
     try:
         headers = {
             'User-Agent': """
-            Mozilla/5.0 
+            Mozilla/5.0
             (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36
             """
         }
@@ -103,10 +103,10 @@ def main():
 
         for newspaper, url in newspapers.items():
             logger.info(f"Downloading {newspaper} from {url}")
-            
+
             # Download webpage
             content = download_webpage(url)
-    
+
             if content:
                 # Create S3 key with the required structure
                 s3_key = f"{S3_PREFIX}/{newspaper}-{curr_date}.html"
@@ -126,6 +126,7 @@ def main():
     except Exception as e:
         logger.error(f"Error in main extraction logic: {str(e)}")
         raise e
+
 
 if __name__ == "__main__":
     main()

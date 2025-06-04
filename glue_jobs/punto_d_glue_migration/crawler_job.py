@@ -259,6 +259,7 @@ def main():
         logger.error(f"Error in main crawler logic: {str(e)}")
         raise e
 
+
 if __name__ == "__main__":
     main()
     job.commit()

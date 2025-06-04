@@ -11,12 +11,12 @@ def download_pages(dir_path: str, curr_date: str):
     """
 
     pages = []
-    
+
     pages.append({
         "file_name": f"{dir_path}/eltiempo-{curr_date}.html",
         "content": fetch_page("https://www.eltiempo.com/")
     })
-    
+
     pages.append({
         "file_name": f"{dir_path}/elespectador-{curr_date}.html",
         "content": fetch_page("https://www.elespectador.com/")

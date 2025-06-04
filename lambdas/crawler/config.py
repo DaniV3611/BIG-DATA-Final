@@ -12,8 +12,8 @@ DATABASE_NAME = os.getenv('GLUE_DATABASE', 'news_headlines_db')
 CRAWLER_NAME = os.getenv('GLUE_CRAWLER_NAME', 'news-headlines-crawler')
 
 # IAM Role for Glue Crawler - Using LabRole that's available
-IAM_ROLE_ARN = os.getenv('GLUE_CRAWLER_ROLE_ARN', 
-                        f'arn:aws:iam::{os.getenv("AWS_ACCOUNT_ID", "913112112666")}:role/LabRole')
+IAM_ROLE_ARN = os.getenv('GLUE_CRAWLER_ROLE_ARN',
+                         f'arn:aws:iam::{os.getenv("AWS_ACCOUNT_ID", "913112112666")}:role/LabRole')
 
 # Lambda Configuration
 LAMBDA_TIMEOUT = int(os.getenv('LAMBDA_TIMEOUT', '900'))  # 15 minutes
@@ -39,4 +39,4 @@ SUPPORTED_NEWSPAPERS = ['eltiempo', 'elespectador']
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 
 # Development/Testing Configuration
-IS_DEVELOPMENT = os.getenv('ENVIRONMENT', 'prod').lower() in ['dev', 'development', 'test'] 
+IS_DEVELOPMENT = os.getenv('ENVIRONMENT', 'prod').lower() in ['dev', 'development', 'test']

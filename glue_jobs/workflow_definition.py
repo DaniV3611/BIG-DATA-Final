@@ -81,6 +81,7 @@ JOBS_CONFIG = {
     }
 }
 
+
 def create_or_update_job(job_name, job_config):
     """
     Create or update a Glue job
@@ -111,19 +112,21 @@ def create_or_update_job(job_name, job_config):
             'WorkerType': 'G.1X',
             'NumberOfWorkers': 2
         }
-        
+
         # Add extra JAR files for MySQL jobs
         if 'mysql' in job_name.lower():
-            job_definition['DefaultArguments']['--extra-jars'] = f's3://{S3_BUCKET}/drivers/mysql-connector-java-8.0.33.jar'
+            job_definition['DefaultArguments']['--extra-jars'] = (
+                f's3://{S3_BUCKET}/drivers/mysql-connector-java-8.0.33.jar'
+            )
             # Increase resources for database operations
             job_definition['WorkerType'] = 'G.2X'
             job_definition['NumberOfWorkers'] = 3
             job_definition['Timeout'] = 120  # 2 hours for database operations
-        
+
         try:
             # Try to get existing job
             glue_client.get_job(JobName=job_name)
-            
+
             # Job exists, update it (remove 'Name' field for update)
             job_update = {k: v for k, v in job_definition.items() if k != 'Name'}
             glue_client.update_job(
@@ -131,7 +134,7 @@ def create_or_update_job(job_name, job_config):
                 JobUpdate=job_update
             )
             logger.info(f"Updated job: {job_name}")
-            
+
         except ClientError as e:
             if e.response['Error']['Code'] == 'EntityNotFoundException':
                 # Job doesn't exist, create it
@@ -139,12 +142,13 @@ def create_or_update_job(job_name, job_config):
                 logger.info(f"Created job: {job_name}")
             else:
                 raise e
-        
+
         return True
-        
+
     except Exception as e:
         logger.error(f"Error creating/updating job {job_name}: {str(e)}")
         return False
+
 
 def create_workflow():
     """
@@ -160,12 +164,12 @@ def create_workflow():
                 'DATABASE_NAME': DATABASE_NAME
             }
         }
-        
+
         try:
             # Try to get existing workflow
             glue_client.get_workflow(Name=WORKFLOW_NAME)
             logger.info(f"Workflow {WORKFLOW_NAME} already exists")
-            
+
         except ClientError as e:
             if e.response['Error']['Code'] == 'EntityNotFoundException':
                 # Workflow doesn't exist, create it
@@ -173,12 +177,13 @@ def create_workflow():
                 logger.info(f"Created workflow: {WORKFLOW_NAME}")
             else:
                 raise e
-        
+
         return True
-        
+
     except Exception as e:
         logger.error(f"Error creating workflow: {str(e)}")
         return False
+
 
 def create_triggers():
     """
@@ -199,7 +204,7 @@ def create_triggers():
                 }
             ]
         }
-        
+
         # Trigger to start processor after extractor completes
         processor_trigger = {
             'Name': f'{WORKFLOW_NAME}-processor-trigger',
@@ -222,7 +227,7 @@ def create_triggers():
                 }
             ]
         }
-        
+
         # Trigger to start crawler after processor completes
         crawler_trigger = {
             'Name': f'{WORKFLOW_NAME}-crawler-trigger',
@@ -245,7 +250,7 @@ def create_triggers():
                 }
             ]
         }
-        
+
         # Trigger to start RDS MySQL job after S3 crawler completes
         rds_mysql_trigger = {
             'Name': f'{WORKFLOW_NAME}-rds-mysql-trigger',
@@ -268,7 +273,7 @@ def create_triggers():
                 }
             ]
         }
-        
+
         # Trigger to start RDS crawler after MySQL job completes
         rds_crawler_trigger = {
             'Name': f'{WORKFLOW_NAME}-rds-crawler-trigger',
@@ -291,24 +296,24 @@ def create_triggers():
                 }
             ]
         }
-        
+
         # Create triggers
         triggers = [start_trigger, processor_trigger, crawler_trigger, rds_mysql_trigger, rds_crawler_trigger]
-        
+
         for trigger in triggers:
             try:
                 # Try to get existing trigger
                 glue_client.get_trigger(Name=trigger['Name'])
-                
+
                 # Trigger exists, update it (remove fields not allowed in TriggerUpdate)
-                trigger_update = {k: v for k, v in trigger.items() 
-                                if k not in ['Name', 'WorkflowName', 'Type']}
+                trigger_update = {k: v for k, v in trigger.items()
+                                  if k not in ['Name', 'WorkflowName', 'Type']}
                 glue_client.update_trigger(
                     Name=trigger['Name'],
                     TriggerUpdate=trigger_update
                 )
                 logger.info(f"Updated trigger: {trigger['Name']}")
-                
+
             except ClientError as e:
                 if e.response['Error']['Code'] == 'EntityNotFoundException':
                     # Trigger doesn't exist, create it
@@ -316,12 +321,13 @@ def create_triggers():
                     logger.info(f"Created trigger: {trigger['Name']}")
                 else:
                     raise e
-        
+
         return True
-        
+
     except Exception as e:
         logger.error(f"Error creating triggers: {str(e)}")
         return False
+
 
 def start_workflow():
     """
@@ -333,10 +339,11 @@ def start_workflow():
         run_id = response['RunId']
         logger.info(f"Started workflow run: {run_id}")
         return True
-        
+
     except Exception as e:
         logger.error(f"Error starting workflow: {str(e)}")
         return False
+
 
 def get_workflow_status():
     """
@@ -347,11 +354,11 @@ def get_workflow_status():
         # Get workflow info
         workflow_response = glue_client.get_workflow(Name=WORKFLOW_NAME)
         workflow = workflow_response['Workflow']
-        
+
         # Get workflow runs
         runs_response = glue_client.get_workflow_runs(Name=WORKFLOW_NAME)
         runs = runs_response['Runs']
-        
+
         status_info = {
             'workflow_name': WORKFLOW_NAME,
             'state': workflow.get('LastRun', {}).get('Status', 'NOT_STARTED'),
@@ -359,7 +366,7 @@ def get_workflow_status():
             'total_runs': len(runs),
             'recent_runs': []
         }
-        
+
         # Get details of recent runs
         for run in runs[:5]:  # Last 5 runs
             run_info = {
@@ -369,12 +376,13 @@ def get_workflow_status():
                 'completed_on': run.get('CompletedOn', '').isoformat() if run.get('CompletedOn') else ''
             }
             status_info['recent_runs'].append(run_info)
-        
+
         return status_info
-        
+
     except Exception as e:
         logger.error(f"Error getting workflow status: {str(e)}")
         return None
+
 
 def main():
     """
@@ -382,7 +390,7 @@ def main():
     """
     try:
         logger.info("Setting up news processing workflow...")
-        
+
         # Create all jobs
         logger.info("Creating/updating Glue jobs...")
         for job_name, job_config in JOBS_CONFIG.items():
@@ -390,33 +398,34 @@ def main():
             if not success:
                 logger.error(f"Failed to create job: {job_name}")
                 return False
-        
+
         # Create workflow
         logger.info("Creating workflow...")
         if not create_workflow():
             logger.error("Failed to create workflow")
             return False
-        
+
         # Create triggers
         logger.info("Creating triggers...")
         if not create_triggers():
             logger.error("Failed to create triggers")
             return False
-        
+
         logger.info("✅ Workflow setup completed successfully!")
-        
+
         # Display status
         status = get_workflow_status()
         if status:
             logger.info(f"Workflow Status: {json.dumps(status, indent=2)}")
-        
+
         return True
-        
+
     except Exception as e:
         logger.error(f"Error in main setup: {str(e)}")
         return False
 
+
 if __name__ == "__main__":
     success = main()
     if not success:
-        exit(1) 
+        exit(1)

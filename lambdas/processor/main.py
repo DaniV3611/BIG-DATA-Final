@@ -28,7 +28,7 @@ def main(record):
     month = date.today().strftime("%m")
     day = date.today().strftime("%d")
 
-    create_directory(f"/tmp")
+    create_directory("/tmp")
 
     # Extraer el nombre del archivo correctamente - manejar tanto paths con carpetas como sin carpetas
     if "/" in file_name:
@@ -39,13 +39,13 @@ def main(record):
     print(f"📰 File name for processing: {file_name_split}")
 
     data = extract_and_parse_info(html_content, curr_date, file_name_split)
-    
+
     # Detectar el periódico
     newspaper_type = detect_newspaper_type(file_name_split)
-    
+
     print(f"🔍 Newspaper type detected: {newspaper_type}")
     print(f"📊 Number of news extracted: {len(data)}")
-    
+
     if len(data) == 0:
         print("⚠️ Warning: No news data extracted!")
         # Intentar ver si hay contenido en el HTML
@@ -56,10 +56,10 @@ def main(record):
             soup = BeautifulSoup(html_content, "html.parser")
             links = soup.find_all("a", href=True)
             print(f"🔗 Total links found: {len(links)}")
-    
+
     # Crear nombre del archivo con estructura de particiones
     csv_file_name = f'/tmp/{file_name_split}.csv'
-    
+
     # Crear la ruta de S3 con particiones según el README
     s3_path = f"headlines/final/periodico={newspaper_type}/year={year}/month={month}/day={day}/{file_name_split}.csv"
 

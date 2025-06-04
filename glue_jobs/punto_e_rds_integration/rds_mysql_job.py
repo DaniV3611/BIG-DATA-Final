@@ -150,7 +150,7 @@ def transform_data_for_mysql(dynamic_frame):
 
         # Filter out null or empty titles
         transformed_df = transformed_df.filter(
-            (col("titular").isNotNull()) & 
+            (col("titular").isNotNull()) &
             (col("titular") != "") &
             (col("fecha").isNotNull())
         )
@@ -187,11 +187,11 @@ def write_to_mysql(dynamic_frame):
         df = dynamic_frame.toDF()
 
         # JDBC connection properties
-        jdbc_properties = {
-            "user": RDS_USERNAME,
-            "password": RDS_PASSWORD,
-            "driver": "com.mysql.cj.jdbc.Driver"
-        }
+        # jdbc_properties = {
+        #     "user": RDS_USERNAME,
+        #     "password": RDS_PASSWORD,
+        #     "driver": "com.mysql.cj.jdbc.Driver"
+        # }
 
         logger.info(f"Connecting to: {JDBC_URL}")
         logger.info(f"Writing to table: {RDS_TABLE}")

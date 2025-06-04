@@ -87,15 +87,17 @@ def extract_eltiempo_news(soup, curr_date):
 
     try:
         # Find news articles in El Tiempo
-        articles = soup.find_all('article') or soup.find_all('div', class_=re.compile(r'.*article.*|.*news.*|.*story.*'))
+        articles = soup.find_all('article') or soup.find_all(
+            'div', class_=re.compile(r'.*article.*|.*news.*|.*story.*')
+        )
 
         for article in articles:
             try:
                 # Extract title
-                title_elem = (article.find('h1') or 
-                            article.find('h2') or 
-                            article.find('h3') or
-                            article.find('a', class_=re.compile(r'.*title.*|.*headline.*')))
+                title_elem = (article.find('h1') or
+                              article.find('h2') or
+                              article.find('h3') or
+                              article.find('a', class_=re.compile(r'.*title.*|.*headline.*')))
 
                 title = title_elem.get_text(strip=True) if title_elem else ''
 
@@ -141,9 +143,9 @@ def extract_elespectador_news(soup, curr_date):
 
     try:
         # Find news articles in El Espectador
-        articles = (soup.find_all('article') or 
-                   soup.find_all('div', class_=re.compile(r'.*article.*|.*news.*|.*story.*')) or
-                   soup.find_all('a', href=True))
+        articles = (soup.find_all('article') or
+                    soup.find_all('div', class_=re.compile(r'.*article.*|.*news.*|.*story.*')) or
+                    soup.find_all('a', href=True))
 
         seen_titles = set()  # To avoid duplicates
 
@@ -154,13 +156,13 @@ def extract_elespectador_news(soup, curr_date):
                     title = article.get_text(strip=True)
                     link = article['href']
                 else:
-                    title_elem = (article.find('h1') or 
-                                article.find('h2') or 
-                                article.find('h3') or
-                                article.find('a'))
+                    title_elem = (article.find('h1') or
+                                  article.find('h2') or
+                                  article.find('h3') or
+                                  article.find('a'))
 
                     title = title_elem.get_text(strip=True) if title_elem else ''
-                    
+
                     link_elem = article.find('a', href=True)
                     link = link_elem['href'] if link_elem else ''
 
@@ -173,10 +175,10 @@ def extract_elespectador_news(soup, curr_date):
                 category = category_elem.get_text(strip=True) if category_elem else 'General'
 
                 # Filter valid news
-                if (title and 
-                    len(title) > 10 and 
+                if (title and
+                    len(title) > 10 and
                     title not in seen_titles and
-                    not title.lower().startswith(('buscar', 'seguir', 'compartir'))):
+                        not title.lower().startswith(('buscar', 'seguir', 'compartir'))):
 
                     seen_titles.add(title)
                     news_list.append({
@@ -222,6 +224,7 @@ def extract_and_parse_info(html_content, curr_date, filename):
     except Exception as e:
         logger.error(f"Error parsing HTML: {str(e)}")
         return []
+
 
 def save_to_s3_csv(data, s3_key):
     """
@@ -311,7 +314,10 @@ def main():
             newspaper_type = detect_newspaper_type(filename)
 
             # Create output S3 key with partitions
-            output_s3_key = f"{S3_OUTPUT_PREFIX}/periodico={newspaper_type}/year={year}/month={month}/day={day}/{filename}.csv"
+            output_s3_key = (
+                f"{S3_OUTPUT_PREFIX}/periodico={newspaper_type}/year={year}/month={month}/day={day}/"
+                f"{filename}.csv"
+            )
 
             # Save to S3
             success = save_to_s3_csv(news_data, output_s3_key)

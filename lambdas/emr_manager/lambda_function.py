@@ -8,40 +8,41 @@ from datetime import datetime
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+
 def lambda_handler(event, context):
     """
     Lambda function to launch EMR cluster, execute classification pipeline, and terminate cluster.
-    
+
     Args:
         event: Lambda event (can be empty or contain configuration overrides)
         context: Lambda context
-    
+
     Returns:
         dict: Response with status and cluster information
     """
-    
+
     try:
         # Configuration
         config = get_config(event)
-        
+
         # Initialize AWS clients
         emr_client = boto3.client('emr', region_name=config['aws_region'])
         s3_client = boto3.client('s3', region_name=config['aws_region'])
-        
+
         # Step 1: Upload script to S3
         script_s3_path = upload_script_to_s3(s3_client, config)
         logger.info(f"Script uploaded to: {script_s3_path}")
-        
+
         # Step 2: Launch EMR cluster
         cluster_id = launch_emr_cluster(emr_client, config, script_s3_path)
         logger.info(f"EMR cluster launched: {cluster_id}")
-        
+
         # Step 3: Monitor cluster and wait for completion
         success = monitor_cluster_execution(emr_client, cluster_id, config)
-        
+
         # Step 4: Terminate cluster (cleanup)
         terminate_cluster(emr_client, cluster_id)
-        
+
         # Prepare response
         response = {
             'statusCode': 200 if success else 500,
@@ -52,9 +53,9 @@ def lambda_handler(event, context):
                 'script_location': script_s3_path
             })
         }
-        
+
         return response
-        
+
     except Exception as e:
         logger.error(f"Lambda execution failed: {str(e)}")
         return {
@@ -68,7 +69,7 @@ def lambda_handler(event, context):
 
 def get_config(event):
     """Get configuration with defaults and overrides from event."""
-    
+
     # Default configuration
     config = {
         'aws_region': 'us-east-1',
@@ -87,21 +88,21 @@ def get_config(event):
         'timeout_minutes': 60,  # Max execution time
         'auto_terminate': True
     }
-    
+
     # Override with event parameters if provided
     if event and isinstance(event, dict):
         config.update(event)
-    
+
     return config
 
 
 def upload_script_to_s3(s3_client, config):
     """Upload classification script to S3."""
-    
+
     try:
         # Script content (embedded in Lambda)
         script_content = get_classification_script()
-        
+
         # Upload to S3
         s3_client.put_object(
             Bucket=config['bucket_name'],
@@ -109,12 +110,12 @@ def upload_script_to_s3(s3_client, config):
             Body=script_content,
             ContentType='text/plain'
         )
-        
+
         script_s3_path = f"s3://{config['bucket_name']}/{config['script_key']}"
         logger.info(f"Script uploaded to S3: {script_s3_path}")
-        
+
         return script_s3_path
-        
+
     except Exception as e:
         logger.error(f"Failed to upload script to S3: {str(e)}")
         raise
@@ -122,7 +123,7 @@ def upload_script_to_s3(s3_client, config):
 
 def launch_emr_cluster(emr_client, config, script_s3_path):
     """Launch EMR cluster with Spark step."""
-    
+
     try:
         # Define cluster configuration
         cluster_config = {
@@ -188,21 +189,21 @@ def launch_emr_cluster(emr_client, config, script_s3_path):
                 }
             ]
         }
-        
+
         # Add optional configurations
         if config.get('ec2_key_pair'):
             cluster_config['Instances']['Ec2KeyName'] = config['ec2_key_pair']
-            
+
         if config.get('subnet_id'):
             cluster_config['Instances']['Ec2SubnetId'] = config['subnet_id']
-        
+
         # Launch cluster
         response = emr_client.run_job_flow(**cluster_config)
         cluster_id = response['JobFlowId']
-        
+
         logger.info(f"EMR cluster launched successfully: {cluster_id}")
         return cluster_id
-        
+
     except Exception as e:
         logger.error(f"Failed to launch EMR cluster: {str(e)}")
         raise
@@ -210,48 +211,48 @@ def launch_emr_cluster(emr_client, config, script_s3_path):
 
 def monitor_cluster_execution(emr_client, cluster_id, config):
     """Monitor cluster execution and wait for completion."""
-    
+
     try:
         timeout_seconds = config['timeout_minutes'] * 60
         start_time = time.time()
-        
+
         logger.info(f"Monitoring cluster {cluster_id} with timeout of {config['timeout_minutes']} minutes")
-        
+
         while True:
             # Check timeout
             if time.time() - start_time > timeout_seconds:
                 logger.error(f"Cluster execution timed out after {config['timeout_minutes']} minutes")
                 return False
-            
+
             try:
                 # Get cluster status
                 response = emr_client.describe_cluster(ClusterId=cluster_id)
-                
+
                 # Debug: log the full response structure
                 logger.info(f"EMR describe_cluster response: {json.dumps(response, default=str)}")
-                
+
                 # Check if response has expected structure
                 if 'Cluster' not in response:
                     logger.error(f"Unexpected response structure: {response}")
                     return False
-                
+
                 cluster = response['Cluster']
                 if 'State' not in cluster:
                     logger.error(f"Cluster object missing State: {cluster}")
                     return False
-                
+
                 cluster_state = cluster['State']
                 logger.info(f"Cluster {cluster_id} state: {cluster_state}")
-                
+
                 if cluster_state in ['COMPLETED', 'TERMINATED']:
                     # Check step status
                     steps_response = emr_client.list_steps(ClusterId=cluster_id)
                     steps = steps_response.get('Steps', [])
-                    
+
                     if steps:
                         step_state = steps[0]['Status']['State']
                         logger.info(f"Step state: {step_state}")
-                        
+
                         if step_state == 'COMPLETED':
                             logger.info("Pipeline completed successfully!")
                             return True
@@ -261,7 +262,7 @@ def monitor_cluster_execution(emr_client, cluster_id, config):
                     else:
                         logger.error("No steps found in cluster")
                         return False
-                        
+
                 elif cluster_state in ['TERMINATED_WITH_ERRORS', 'TERMINATING']:
                     logger.error(f"Cluster failed with state: {cluster_state}")
                     return False
@@ -269,22 +270,30 @@ def monitor_cluster_execution(emr_client, cluster_id, config):
                     logger.info(f"Cluster is in progress: {cluster_state}")
                 else:
                     logger.warning(f"Unknown cluster state: {cluster_state}")
-                    
+
             except Exception as inner_e:
                 logger.error(f"Error getting cluster status: {str(inner_e)}")
                 # Try to get more information about the cluster
                 try:
                     list_response = emr_client.list_clusters(
-                        ClusterStates=['STARTING', 'BOOTSTRAPPING', 'RUNNING', 'WAITING', 'TERMINATING', 'TERMINATED', 'TERMINATED_WITH_ERRORS']
+                        ClusterStates=[
+                            'STARTING',
+                            'BOOTSTRAPPING',
+                            'RUNNING',
+                            'WAITING',
+                            'TERMINATING',
+                            'TERMINATED',
+                            'TERMINATED_WITH_ERRORS'
+                        ]
                     )
                     logger.info(f"Available clusters: {json.dumps(list_response, default=str)}")
                 except Exception as list_e:
                     logger.error(f"Failed to list clusters: {str(list_e)}")
                 return False
-                
+
             # Wait before next check
             time.sleep(30)
-            
+
     except Exception as e:
         logger.error(f"Error monitoring cluster: {str(e)}")
         return False
@@ -292,12 +301,12 @@ def monitor_cluster_execution(emr_client, cluster_id, config):
 
 def terminate_cluster(emr_client, cluster_id):
     """Terminate EMR cluster."""
-    
+
     try:
         logger.info(f"Terminating cluster: {cluster_id}")
         emr_client.terminate_job_flows(JobFlowIds=[cluster_id])
         logger.info(f"Cluster {cluster_id} termination initiated")
-        
+
     except Exception as e:
         logger.error(f"Failed to terminate cluster {cluster_id}: {str(e)}")
         # Don't raise - this is cleanup
@@ -305,7 +314,7 @@ def terminate_cluster(emr_client, cluster_id):
 
 def get_classification_script():
     """Return the classification script content."""
-    
+
     # This is the script we created earlier
     script_content = '''#!/usr/bin/env python3
 """
@@ -347,7 +356,7 @@ def create_spark_session(app_name=APP_NAME):
             .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \\
             .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \\
             .getOrCreate()
-        
+
         spark.sparkContext.setLogLevel("WARN")
         logger.info(f"Spark session created successfully: {spark}")
         return spark
@@ -361,11 +370,11 @@ def load_data(spark, input_path=INPUT_PATH):
     try:
         logger.info(f"Loading data from: {input_path}")
         df = spark.read.option("header", "true").csv(input_path)
-        
+
         count = df.count()
         logger.info(f"Loaded {count} records")
         logger.info(f"Schema: {df.columns}")
-        
+
         return df
     except Exception as e:
         logger.error(f"Failed to load data from {input_path}: {e}")
@@ -376,20 +385,20 @@ def preprocess_data(df):
     """Clean and preprocess the data."""
     try:
         logger.info("Starting data preprocessing...")
-        
+
         df_clean = df.select(
             col("categoria").alias("label"),
             lower(regexp_replace(col("titular"), "[^a-zA-ZáéíóúñÁÉÍÓÚÑ ]", "")).alias("clean_text")
         ).na.drop()
-        
+
         df_clean = df_clean.filter(col("clean_text") != "")
-        
+
         clean_count = df_clean.count()
         logger.info(f"After cleaning: {clean_count} records")
-        
+
         logger.info("Category distribution:")
         df_clean.groupBy("label").count().orderBy(col("count").desc()).show(20)
-        
+
         return df_clean
     except Exception as e:
         logger.error(f"Failed to preprocess data: {e}")
@@ -400,21 +409,21 @@ def create_ml_pipeline(num_features=NUM_FEATURES, max_iter=MAX_ITER):
     """Create the ML pipeline with TF-IDF and Logistic Regression."""
     try:
         logger.info(f"Creating ML pipeline with {num_features} features and {max_iter} iterations...")
-        
+
         tokenizer = Tokenizer(inputCol="clean_text", outputCol="words")
         remover = StopWordsRemover(inputCol="words", outputCol="filtered_words")
         hashingTF = HashingTF(inputCol="filtered_words", outputCol="rawFeatures", numFeatures=num_features)
         idf = IDF(inputCol="rawFeatures", outputCol="features")
         indexer = StringIndexer(inputCol="label", outputCol="labelIndex")
-        
+
         lr = LogisticRegression(
-            featuresCol="features", 
-            labelCol="labelIndex", 
+            featuresCol="features",
+            labelCol="labelIndex",
             maxIter=max_iter
         )
-        
+
         pipeline = Pipeline(stages=[tokenizer, remover, hashingTF, idf, indexer, lr])
-        
+
         logger.info("ML pipeline created successfully")
         return pipeline
     except Exception as e:
@@ -426,10 +435,10 @@ def train_model(pipeline, df_clean):
     """Train the machine learning model."""
     try:
         logger.info("Starting model training...")
-        
+
         model = pipeline.fit(df_clean)
         logger.info("Model training completed")
-        
+
         return model
     except Exception as e:
         logger.error(f"Failed to train model: {e}")
@@ -441,10 +450,10 @@ def generate_predictions(model, df_clean):
     try:
         logger.info("Generating predictions...")
         predictions = model.transform(df_clean)
-        
+
         logger.info("Sample predictions:")
         predictions.select("clean_text", "label", "prediction", "probability").show(10, truncate=False)
-        
+
         return predictions
     except Exception as e:
         logger.error(f"Failed to generate predictions: {e}")
@@ -455,29 +464,29 @@ def save_results(predictions, output_base_path=OUTPUT_BASE_PATH):
     """Save results to S3 - same format as original notebook."""
     try:
         logger.info(f"Saving results to: {output_base_path}")
-        
+
         predictions.select("clean_text", "label", "prediction") \\
                   .write.mode("overwrite") \\
                   .option("header", "true") \\
                   .csv(f"{output_base_path}/predicciones.csv")
-        
+
         predictions.withColumn("probability_str", col("probability").cast("string")) \\
                   .select("clean_text", "label", "prediction", "probability_str") \\
                   .write.mode("overwrite") \\
                   .option("header", "true") \\
                   .csv(f"{output_base_path}/predicciones_prob.csv")
-        
+
         predictions.write.mode("overwrite") \\
                   .parquet(f"{output_base_path}/predicciones_parquet/")
-        
+
         logger.info("Results saved successfully")
-        
+
         total_predictions = predictions.count()
         logger.info(f"Total predictions generated: {total_predictions}")
-        
+
         logger.info("Prediction distribution:")
         predictions.groupBy("prediction").count().orderBy("prediction").show()
-        
+
     except Exception as e:
         logger.error(f"Failed to save results: {e}")
         sys.exit(1)
@@ -492,9 +501,9 @@ def main():
     logger.info(f"Output path: {OUTPUT_BASE_PATH}")
     logger.info(f"Number of features: {NUM_FEATURES}")
     logger.info(f"Max iterations: {MAX_ITER}")
-    
+
     spark = create_spark_session()
-    
+
     try:
         df = load_data(spark)
         df_clean = preprocess_data(df)
@@ -502,11 +511,11 @@ def main():
         model = train_model(pipeline, df_clean)
         predictions = generate_predictions(model, df_clean)
         save_results(predictions)
-        
+
         logger.info("=" * 60)
         logger.info("PIPELINE COMPLETED SUCCESSFULLY")
         logger.info("=" * 60)
-        
+
     except Exception as e:
         logger.error(f"Pipeline failed: {e}")
         sys.exit(1)
@@ -518,5 +527,5 @@ def main():
 if __name__ == "__main__":
     main()
 '''
-    
-    return script_content 
+
+    return script_content

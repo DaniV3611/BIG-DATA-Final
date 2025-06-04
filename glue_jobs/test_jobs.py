@@ -14,6 +14,7 @@ from botocore.exceptions import ClientError
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class GlueJobTester:
     def __init__(self, aws_region='us-east-1'):
         """
@@ -151,7 +152,7 @@ class GlueJobTester:
             return False
 
         logger.info(f"🧪 Testing job: {job_name}")
-        
+
         # Check if job exists
         if not self.test_job_exists(job_name):
             return False
@@ -224,7 +225,7 @@ class GlueJobTester:
                     Name=self.workflow_name,
                     RunId=run_id
                 )
-                
+
                 workflow_run = response['Run']
                 status = workflow_run['Status']
 
@@ -241,7 +242,7 @@ class GlueJobTester:
                     return True
 
                 elif status == 'FAILED':
-                    logger.error(f"❌ Workflow failed")
+                    logger.error("❌ Workflow failed")
                     return False
 
                 elif status in ['STOPPED', 'STOPPING']:
@@ -264,7 +265,7 @@ class GlueJobTester:
         @return: Success boolean
         """
         logger.info(f"🧪 Testing workflow: {self.workflow_name}")
- 
+
         # Check if workflow exists
         if not self.test_workflow_exists():
             return False
@@ -396,7 +397,7 @@ def main():
         print("\nTest types:")
         print("  all        - Run all tests")
         print("  extractor  - Test extractor job only")
-        print("  processor  - Test processor job only") 
+        print("  processor  - Test processor job only")
         print("  crawler    - Test crawler job only")
         print("  workflow   - Test workflow only")
         print("  validate   - Validate S3 output only (requires s3_bucket)")

@@ -10,7 +10,7 @@ def fetch_page(page_url: str):
     @param page_url: URL of the page to download
     @return: Request response (HTML code)
     """
-    
+
     response = requests.get(
         page_url, headers=API_HEADERS
     )
