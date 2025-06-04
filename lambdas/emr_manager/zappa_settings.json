@@ -1,0 +1,21 @@
+{
+    "dev": {
+        "app_function": "lambda_function.lambda_handler",
+        "aws_region": "us-east-1",
+        "exclude": [
+            "boto3",
+            "dateutil",
+            "botocore",
+            "s3transfer",
+            "concurrent"
+        ],
+        "profile_name": "default",
+        "project_name": "emr-manager",
+        "runtime": "python3.11",
+        "s3_bucket": "zappa-dm90tfvvr",
+        "keep_warm": false,
+        "apigateway_enabled": false,
+        "manage_roles": false,
+        "role_name": "LabRole"
+        }
+}

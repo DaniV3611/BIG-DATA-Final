@@ -1,0 +1,21 @@
+# Requirements for EMR Classification Pipeline
+# These packages are typically pre-installed in EMR, but listed for reference
+
+# Core Spark dependencies (pre-installed in EMR)
+# pyspark>=3.3.0
+
+# Python standard library packages used:
+# - argparse (built-in)
+# - sys (built-in) 
+# - logging (built-in)
+
+# EMR comes with these ML libraries pre-installed:
+# - pyspark.sql
+# - pyspark.ml.feature
+# - pyspark.ml.classification
+# - pyspark.ml
+# - pyspark.ml.evaluation
+
+# Optional: For local development/testing
+# pyspark==3.4.1
+# py4j==0.10.9.7 

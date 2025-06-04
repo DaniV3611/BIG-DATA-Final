@@ -62,6 +62,42 @@ Repetir los puntos **a)** al **c)** implementados como:
 - Suite de testing comprehensiva
 - Documentación detallada
 
+#### f) Pipeline de Machine Learning con PySpark ✅
+
+Crear un pipeline de procesamiento usando **PySpark ML** en **Notebook sobre EMR**:
+
+**Características implementadas:**
+
+- ✅ Vectorización con **TF-IDF**
+- ✅ Modelo de clasificación **Logistic Regression**
+- ✅ Script ejecutable para EMR con **spark-submit**
+- ✅ Resultados escritos en **S3** (múltiples formatos)
+- ✅ Manejo robusto de errores y logging
+- ✅ Evaluación train/test del modelo
+
+**📂 Implementación disponible en:** `emr_scripts/`
+
+#### g) Automatización EMR con Lambda ✅
+
+**Implementación completa:**
+
+- ✅ Convertir notebook anterior en **script ejecutable**
+- ✅ Crear lambda que:
+  - Lance un cluster EMR automáticamente
+  - Ejecute el script con `spark-submit`
+  - Monitoree la ejecución completa
+  - Apague el cluster automáticamente (ahorro de costos)
+
+**📂 Implementación disponible en:** `lambdas/emr_manager/`
+
+**Características del Lambda:**
+- Configuración automática de cluster EMR
+- Upload dinámico del script a S3
+- Monitoreo en tiempo real de la ejecución
+- Cleanup automático de recursos
+- Manejo robusto de errores y timeouts
+- Soporte para configuración personalizada
+
 ### 🚧 Pendientes
 
 #### e) Integración con RDS MySQL
@@ -76,26 +112,6 @@ Repetir los puntos **a)** al **c)** implementados como:
 - Usar **AWS Glue Connectors** y **AWS Job**
 - Copiar de tabla a tabla (S3 → RDS en el catálogo)
 - **Activar "job bookmarks"** para evitar duplicados
-
-#### f) Pipeline de Machine Learning con PySpark
-
-Crear un pipeline de procesamiento usando **PySpark ML** en **Notebook sobre EMR**:
-
-**Características:**
-
-- Vectorización con **TF-IDF**
-- Modelo de clasificación (si aplica conocimiento de Aprendizaje de Máquina)
-- Resultados escritos en **S3**
-
-#### g) Automatización EMR con Lambda
-
-**Implementación:**
-
-- Convertir notebook anterior en **script ejecutable**
-- Crear lambda que:
-  - Lance un cluster EMR
-  - Ejecute el script con `spark-submit`
-  - Apague el cluster automáticamente
 
 ## Requisitos de Entrega
 
@@ -135,7 +151,12 @@ Crear un pipeline de procesamiento usando **PySpark ML** en **Notebook sobre EMR
 ├── lambdas/
 │   ├── extractor/               # Lambda de extracción web
 │   ├── processor/               # Lambda de procesamiento HTML
-│   └── crawler/                # Lambda de crawler Glue
+│   ├── crawler/                # Lambda de crawler Glue
+│   └── emr_manager/            # ✅ Lambda de gestión EMR
+│       ├── lambda_function.py  # Lógica principal del Lambda
+│       ├── requirements.txt    # Dependencias AWS
+│       ├── zappa_settings.json # Configuración deployment
+│       └── README.md          # Documentación completa
 ├── glue_jobs/                  # ✅ Jobs y Workflows de Glue
 │   ├── extractor_job.py        # Job de extracción migrado
 │   ├── processor_job.py        # Job de procesamiento migrado
@@ -145,7 +166,12 @@ Crear un pipeline de procesamiento usando **PySpark ML** en **Notebook sobre EMR
 │   ├── test_jobs.py           # Suite de testing
 │   ├── requirements.txt        # Dependencias
 │   └── README.md              # Documentación detallada
-├── emr_scripts/               # Scripts para EMR (pendiente)
+├── emr_scripts/               # ✅ Scripts para EMR
+│   ├── classification_pipeline.py  # Script de ML ejecutable
+│   ├── requirements.txt        # Dependencias de EMR
+│   └── README.md              # Documentación de EMR
+├── notebook/                  # 📓 Notebooks de desarrollo
+│   └── classification.ipynb   # Notebook original de ML
 ├── tests/                     # Pruebas unitarias
 ├── .github/workflows/         # CI/CD pipelines
 └── README.md                  # Esta documentación
@@ -176,6 +202,60 @@ python test_jobs.py all YOUR_BUCKET_NAME
 
 Para más detalles, consultar: [`glue_jobs/README.md`](glue_jobs/README.md)
 
+## 🚀 Quick Start - EMR ML Pipeline (Punto f)
+
+### 1. Subir script a S3
+```bash
+aws s3 cp emr_scripts/classification_pipeline.py s3://your-bucket/scripts/
+```
+
+### 2. Ejecutar en cluster EMR
+```bash
+spark-submit \
+    --deploy-mode cluster \
+    --driver-memory 4g \
+    --executor-memory 4g \
+    s3://your-bucket/scripts/classification_pipeline.py \
+    --input-path "s3://final-gizmo/headlines/final/periodico=*/year=*/month=*/day=*/*.csv" \
+    --output-path "s3://final-gizmo/resultados/"
+```
+
+Para más detalles, consultar: [`emr_scripts/README.md`](emr_scripts/README.md)
+
+## 🚀 Quick Start - EMR Lambda Manager (Punto g)
+
+### 1. Desplegar Lambda con Zappa
+```bash
+cd lambdas/emr_manager/
+pip install -r requirements.txt
+pip install zappa
+zappa deploy dev
+```
+
+### 2. Ejecutar pipeline completo
+```bash
+# Ejecución básica
+aws lambda invoke \
+    --function-name emr-manager-dev \
+    --payload '{}' \
+    response.json
+
+# Con configuración personalizada
+aws lambda invoke \
+    --function-name emr-manager-dev \
+    --payload '{"core_instance_count": 3, "timeout_minutes": 90}' \
+    response.json
+```
+
+### 3. Programar ejecución diaria
+```bash
+aws events put-rule \
+    --name "daily-ml-pipeline" \
+    --schedule-expression "cron(0 2 * * ? *)"
+```
+
+Para más detalles, consultar: [`lambdas/emr_manager/README.md`](lambdas/emr_manager/README.md)
+
 ## 📈 Roadmap
 
 - [x] **Punto a)** - Lambda Extractor con Zappa
@@ -183,8 +263,8 @@ Para más detalles, consultar: [`glue_jobs/README.md`](glue_jobs/README.md)
 - [x] **Punto c)** - Lambda Crawler para Glue
 - [x] **Punto d)** - Migración a Glue Jobs y Workflows
 - [ ] **Punto e)** - Integración con RDS MySQL
-- [ ] **Punto f)** - Pipeline de ML con PySpark
-- [ ] **Punto g)** - Automatización EMR con Lambda
+- [x] **Punto f)** - Pipeline de ML con PySpark (Script ✅)
+- [x] **Punto g)** - Automatización EMR con Lambda (✅ COMPLETADO)
 - [ ] **CI/CD** - Pipeline de despliegue continuo
 - [ ] **Testing** - Cobertura completa de pruebas
 
@@ -210,20 +290,41 @@ graph TB
     D --> G
     G --> H
     
-    subgraph "Future (Pendiente)"
-        I[RDS MySQL]
-        J[EMR ML Pipeline]
-        K[Lambda EMR Manager]
+    subgraph "EMR ML Pipeline (✅ Automatizado)"
+        I[Lambda EMR Manager]
+        J[EMR Cluster Auto]
+        K[Classification Script]
+        L[ML Results S3]
     end
     
-    F -.-> I
-    F -.-> J
-    K -.-> J
+    I --> J
+    J --> K
+    K --> L
+    F --> J
+    
+    subgraph "Triggers & Automation"
+        M[Manual Trigger]
+        N[Scheduled Trigger]
+        O[API Gateway]
+    end
+    
+    M --> I
+    N --> I
+    O --> I
+    
+    subgraph "Future (Pendiente)"
+        P[RDS MySQL]
+    end
+    
+    F -.-> P
 ```
 
 ## 🔗 Enlaces Útiles
 
 - [Documentación AWS Glue](https://docs.aws.amazon.com/glue/)
+- [Documentación AWS EMR](https://docs.aws.amazon.com/emr/)
+- [Documentación AWS Lambda](https://docs.aws.amazon.com/lambda/)
 - [Documentación Zappa](https://github.com/zappa/Zappa)
 - [AWS CLI Setup](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
 - [BeautifulSoup Documentation](https://www.crummy.com/software/BeautifulSoup/bs4/doc/)
+- [PySpark ML Guide](https://spark.apache.org/docs/latest/ml-guide.html)
