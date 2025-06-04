@@ -1,0 +1,33 @@
+{
+    "dev": {
+        "app_function": "main.lambda_handler",
+        "aws_region": "us-east-1",
+        "exclude": ["boto3", "dateutil", "botocore", "s3transfer", "concurrent"],
+        "profile_name": "default",
+        "project_name": "crawler",
+        "runtime": "python3.12",
+        "s3_bucket": "zappa-m82yx2rub",
+        "keep_warm": false,
+        "apigateway_enabled": false,
+        "manage_roles": false,
+        "role_name": "LabRole",
+        "timeout_seconds": 900,
+        "memory_size": 512,
+        "environment_variables": {
+            "LOG_LEVEL": "INFO",
+            "ENVIRONMENT": "dev",
+            "GLUE_DATABASE": "news_headlines_db",
+            "GLUE_CRAWLER_NAME": "news-headlines-crawler",
+            "S3_BUCKET": "final-gizmo"
+        },
+        "events": [
+            {
+                "function": "main.lambda_handler",
+                "event_source": {
+                    "arn": "arn:aws:s3:::final-gizmo",
+                    "events": ["s3:ObjectCreated:*"]
+                }
+            }
+        ]
+    }
+} 
