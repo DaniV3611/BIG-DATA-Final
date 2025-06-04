@@ -20,4 +20,7 @@ requests>=2.31.0
 flake8>=6.0.0
 
 # Utilities
-colorama>=0.4.6 
+colorama>=0.4.6
+
+# AWS SDK
+boto3>=1.28.0 
